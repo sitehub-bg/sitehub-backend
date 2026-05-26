@@ -40,7 +40,7 @@ async-trait        = "0.1"
 axum               = "0.8"
 tower              = "0.5"
 tower-http         = { version = "0.6", features = ["trace", "cors"] }
-surrealdb          = { version = "3.0", features = ["protocol-ws"] }
+surrealdb          = { version = "3.1", features = ["protocol-ws"] }
 jsonwebtoken       = "9"
 dotenvy            = "0.15"
 
