@@ -2,7 +2,7 @@ app = "sitehub-db-staging"
 primary_region = "fra"
 
 [build]
-  image = "surrealdb/surrealdb:v3"
+  image = "surrealdb/surrealdb:v3.1.0"
 
 [mounts]
   source = "surreal_data"

@@ -1,4 +1,4 @@
-# ADR-0016: SurrealDB 3.0 as data store version
+# ADR-0016: SurrealDB 3.x as data store version
 
 Date: 2026-05-26
 Status: Accepted
@@ -14,9 +14,7 @@ Since we have zero production data and no existing schema, there's no migration 
 
 ## Decision
 
-Use `surrealdb = "3.0"` (currently resolves to 3.0.5). Docker images use `surrealdb/surrealdb:v3`. Local storage backend is `surrealkv:` (replaces the v2 `file:` backend).
-
-We pin to the `3.0` semver range (not `3.1.0-beta.*`) to stay on stable releases.
+Use `surrealdb = "3.1"` (currently resolves to 3.1.0). Docker images pinned to `surrealdb/surrealdb:v3.1.0`. Local storage backend is `surrealkv:` (replaces the v2 `file:` backend). Dependabot bumps the Docker image tag when new patches are released.
 
 ## Alternatives considered
 
