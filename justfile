@@ -57,6 +57,10 @@ up:
 down:
     docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 
+# Connect to staging DB via Fly proxy (localhost:8000)
+db-proxy:
+    flyctl proxy 8000 --app sitehub-db-staging
+
 # Build Docker image
 docker:
     docker build -t sitehub .

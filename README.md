@@ -86,8 +86,18 @@ Tenants are identified by subdomain (e.g., `mg-geo-milev.sitehub.bg`). Storage i
 ## API routing
 
 ```
-api.sitehub.bg/web/v1/...       → public API (SSG builds)
-api.sitehub.bg/mobile/v1/...    → public API (mobile app)
-admin.sitehub.bg/v1/...         → admin API (JWT required)
-auth.sitehub.bg/v1/...          → auth API (login, tokens)
+admin.sitehub.bg/...    → admin API (JWT required)
+auth.sitehub.bg/...     → auth API (login, tokens)
+*.sitehub.bg/...        → public API (tenant resolved from subdomain)
+
+Reserved subdomains: admin, auth, api
+```
+
+## Accessing the staging database
+
+The database is not publicly exposed. To connect for debugging, open a temporary tunnel via Fly proxy:
+
+```bash
+~/.fly/bin/flyctl proxy 8000 --app sitehub-db-staging
+# DB is now available at localhost:8000 — close the terminal to disconnect
 ```

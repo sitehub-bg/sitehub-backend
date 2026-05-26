@@ -103,7 +103,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: registry.fly.io/sitehub-backend
+          images: |
+            registry.fly.io/sitehub-backend-staging
+            registry.fly.io/sitehub-backend-production
           tags: |
             type=raw,value=${{ github.sha }}
             type=ref,event=branch
@@ -126,10 +128,11 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
+      - uses: actions/checkout@v4
       - uses: superfly/flyctl-action/setup-flyctl@v2
 
       - name: Deploy to staging
-        run: flyctl deploy --image registry.fly.io/sitehub-backend:${{ github.sha }} --app sitehub-backend-staging
+        run: flyctl deploy --image registry.fly.io/sitehub-backend-staging:${{ github.sha }} --config deploy/backend-staging.toml --app sitehub-backend-staging
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
@@ -140,9 +143,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - uses: actions/checkout@v4
       - uses: superfly/flyctl-action/setup-flyctl@v2
 
       - name: Deploy to production
-        run: flyctl deploy --image registry.fly.io/sitehub-backend:${{ github.sha }} --app sitehub-backend
+        run: flyctl deploy --image registry.fly.io/sitehub-backend-production:${{ github.sha }} --config deploy/backend-production.toml --app sitehub-backend-production
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

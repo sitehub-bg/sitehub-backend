@@ -1,0 +1,21 @@
+name: Deploy DB (Production)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-action/setup-flyctl@v2
+
+      - name: Deploy SurrealDB to production
+        run: flyctl deploy --config deploy/db-production.toml --app sitehub-db-production
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

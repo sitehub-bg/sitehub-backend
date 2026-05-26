@@ -11,7 +11,7 @@ docs/
 .env.production
 deny.toml
 rustfmt.toml
-fly.toml
+deploy/
 docker-compose.yml
 docker-compose.dev.yml
 justfile
