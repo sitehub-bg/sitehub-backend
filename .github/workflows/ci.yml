@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ---------- Format check (fast, no compilation) ----------
+  # ---------- Format check (no compilation) ----------
   fmt:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -40,8 +40,8 @@ jobs:
       - name: Dependency audit
         run: cargo deny check
 
-  # ---------- Clippy (needs compilation) ----------
-  clippy:
+  # ---------- Compile workspace (shared cache for downstream jobs) ----------
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -52,27 +52,48 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-build
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build workspace
+        run: cargo build --locked --workspace --all-targets
+
+  # ---------- Clippy (warm cache from build) ----------
+  clippy:
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build
+          save-if: false
       - name: Clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
-  # ---------- Unit tests ----------
+  # ---------- Unit tests (warm cache from build) ----------
   test-unit:
+    needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.95
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-build
+          save-if: false
       - uses: taiki-e/install-action@nextest
       - name: Unit tests
         run: cargo nextest run --locked --workspace
 
-  # ---------- Integration tests with SurrealDB ----------
+  # ---------- Integration tests (warm cache from build) ----------
   test-integration:
+    needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     env:
       SURREAL_URL: ws://localhost:8000
       SURREAL_NS: sitehub_test
@@ -85,6 +106,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-build
+          save-if: false
       - uses: taiki-e/install-action@nextest
 
       - name: Start SurrealDB
