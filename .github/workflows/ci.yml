@@ -128,16 +128,28 @@ jobs:
             sleep 1
           done
 
+      - name: Build server
+        run: cargo build --locked -p sitehub-bin
+
       - name: Start server
-        run: cargo run --locked -p sitehub-bin &
+        run: |
+          ./target/debug/sitehub > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
 
       - name: Wait for server
         run: |
           for i in $(seq 1 30); do
             curl -sf http://localhost:3000/api/health 2>/dev/null && exit 0
+            if ! kill -0 $(cat /tmp/server.pid) 2>/dev/null; then
+              echo "Server process died. Logs:"
+              cat /tmp/server.log
+              exit 1
+            fi
             sleep 1
           done
-          echo "Server failed to start within 30 seconds" && exit 1
+          echo "Server failed to start within 30 seconds. Logs:"
+          cat /tmp/server.log
+          exit 1
 
       - name: API tests (${{ matrix.package }})
         run: cargo nextest run --locked -p ${{ matrix.package }}
