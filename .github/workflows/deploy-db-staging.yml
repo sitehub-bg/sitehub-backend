@@ -1,0 +1,25 @@
+name: Deploy DB (Staging)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-db-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging
+    steps:
+      - uses: actions/checkout@v6
+      - uses: superfly/flyctl-action/setup-flyctl@v2
+
+      - name: Deploy SurrealDB to staging
+        run: flyctl deploy --config deploy/db-staging.toml --app sitehub-db-staging
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

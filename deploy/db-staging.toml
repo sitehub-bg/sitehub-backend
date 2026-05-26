@@ -1,0 +1,31 @@
+app = "sitehub-db-staging"
+primary_region = "fra"
+
+[build]
+  image = "surrealdb/surrealdb:v3.1.0"
+
+[mounts]
+  source = "surreal_data"
+  destination = "/data"
+
+# Credentials set via Fly secrets: flyctl secrets set SURREAL_USER=... SURREAL_PASS=... --app sitehub-db-staging
+[env]
+  SURREAL_BIND = "0.0.0.0:8000"
+  SURREAL_PATH = "surrealkv:/data/sitehub.db"
+
+[[services]]
+  internal_port = 8000
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8000
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"

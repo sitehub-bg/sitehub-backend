@@ -1,5 +1,5 @@
 # Run all checks (what CI runs)
-check: fmt clippy deny test
+check: fmt build clippy deny test
 
 # Format code (nightly rustfmt for import grouping)
 fmt:
@@ -17,13 +17,13 @@ clippy:
 deny:
     cargo deny check
 
-# Unit tests
+# Unit tests (excludes API test projects)
 test:
-    cargo nextest run --locked --workspace
+    cargo nextest run --locked --workspace --exclude sitehub-public-api-tests --exclude sitehub-admin-api-tests --exclude sitehub-auth-api-tests
 
-# Integration tests (requires SurrealDB running)
-test-integration:
-    cargo nextest run --locked --workspace --run-ignored ignored-only
+# API tests (requires server + SurrealDB running)
+test-api:
+    cargo nextest run --locked -p sitehub-public-api-tests -p sitehub-admin-api-tests -p sitehub-auth-api-tests
 
 # Run the server
 run:
@@ -56,6 +56,10 @@ up:
 # Stop full stack
 down:
     docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+
+# Connect to staging DB via Fly proxy (localhost:8000)
+db-proxy:
+    flyctl proxy 8000 --app sitehub-db-staging
 
 # Build Docker image
 docker:

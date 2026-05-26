@@ -4,7 +4,6 @@ on:
   pull_request:
   push:
     branches: [main]
-    tags: ["v*"]
 
 permissions:
   contents: read
@@ -13,87 +12,162 @@ env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
 
-# Cancel superseded runs on the same PR/branch.
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ---------- Lint & unit tests (every PR + push to main) ----------
-  check:
+  # ---------- Format check (no compilation) ----------
+  fmt:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
+      - name: Format check
+        run: cargo +nightly fmt --all -- --check
+
+  # ---------- Dependency audit (no compilation) ----------
+  deny:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@cargo-deny
+      - name: Dependency audit
+        run: cargo deny check
+
+  # ---------- Compile workspace (shared cache for downstream jobs) ----------
+  build:
+    needs: [fmt, deny]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@1.95
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build workspace
+        run: cargo build --locked --workspace --all-targets
 
-      - name: Format check
-        run: cargo +nightly fmt --all -- --check
-
+  # ---------- Clippy (warm cache from build) ----------
+  clippy:
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@1.95
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build
+          save-if: false
       - name: Clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
-      - name: Install tools
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-deny,cargo-nextest
-
-      - name: Dependency audit
-        run: cargo deny check
-
-      - name: Unit tests
-        run: cargo nextest run --locked --workspace
-
-  # ---------- Integration tests with SurrealDB (every PR + push to main) ----------
-  integration:
+  # ---------- Unit tests (warm cache from build) ----------
+  test-unit:
+    needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@1.95
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build
+          save-if: false
+      - uses: taiki-e/install-action@nextest
+      - name: Unit tests
+        run: cargo nextest run --locked --workspace --exclude sitehub-public-api-tests --exclude sitehub-admin-api-tests --exclude sitehub-auth-api-tests
+
+  # ---------- API tests (warm cache from build, live server + SurrealDB) ----------
+  test-api:
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        package:
+          - sitehub-public-api-tests
+          - sitehub-admin-api-tests
+          - sitehub-auth-api-tests
     env:
       SURREAL_URL: ws://localhost:8000
-      SURREAL_NS: sitehub_test
+      SURREAL_NS: sitehub
       SURREAL_DB: test
       SURREAL_USER: root
       SURREAL_PASS: root
+      SITEHUB_HOST: 127.0.0.1
+      SITEHUB_PORT: 3000
+      SITEHUB_TEST_URL: http://localhost:3000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@1.95
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-build
+          save-if: false
       - uses: taiki-e/install-action@nextest
 
       - name: Start SurrealDB
         run: |
           docker run -d --name surrealdb -p 8000:8000 \
-            surrealdb/surrealdb:v3 start \
+            surrealdb/surrealdb:v3.1.0 start \
             --user root --pass root --bind 0.0.0.0:8000 memory
-          until docker exec surrealdb surreal is-ready --endpoint http://localhost:8000 2>/dev/null; do
+          for i in $(seq 1 30); do
+            docker exec surrealdb /surreal is-ready --endpoint http://localhost:8000 2>/dev/null && break
             sleep 1
           done
 
-      - name: Integration tests
-        run: cargo nextest run --locked --workspace --run-ignored ignored-only
-        # Convention: mark integration tests with #[ignore] so they only
-        # run in this job where SurrealDB is available.
+      - name: Build server
+        run: cargo build --locked -p sitehub-bin
 
-  # ---------- Build & push Docker image (main + tags only) ----------
-  docker:
-    needs: [check, integration]
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      - name: Start server
+        run: |
+          ./target/debug/sitehub > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
+
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health 2>/dev/null && exit 0
+            if ! kill -0 $(cat /tmp/server.pid) 2>/dev/null; then
+              echo "Server process died. Logs:"
+              cat /tmp/server.log
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "Server failed to start within 30 seconds. Logs:"
+          cat /tmp/server.log
+          exit 1
+
+      - name: API tests (${{ matrix.package }})
+        run: cargo nextest run --locked -p ${{ matrix.package }}
+
+  # ---------- Build & deploy staging (push to main) ----------
+  docker-staging:
+    needs: [fmt, deny, clippy, test-unit, test-api]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: registry.fly.io
           username: x
@@ -101,14 +175,12 @@ jobs:
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
-          images: registry.fly.io/sitehub-backend
+          images: registry.fly.io/sitehub-backend-staging
           tags: |
             type=raw,value=${{ github.sha }}
             type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
 
       - uses: docker/build-push-action@v6
         with:
@@ -119,30 +191,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ---------- Deploy to staging (push to main) ----------
   deploy-staging:
-    needs: [docker]
-    if: github.ref == 'refs/heads/main'
+    needs: [docker-staging]
     runs-on: ubuntu-latest
     environment: staging
     steps:
+      - uses: actions/checkout@v6
       - uses: superfly/flyctl-action/setup-flyctl@v2
 
       - name: Deploy to staging
-        run: flyctl deploy --image registry.fly.io/sitehub-backend:${{ github.sha }} --app sitehub-backend-staging
+        run: flyctl deploy --image registry.fly.io/sitehub-backend-staging:${{ github.sha }} --config deploy/backend-staging.toml --app sitehub-backend-staging
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-  # ---------- Deploy to production (tagged release v*) ----------
-  deploy-production:
-    needs: [docker]
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: superfly/flyctl-action/setup-flyctl@v2
-
-      - name: Deploy to production
-        run: flyctl deploy --image registry.fly.io/sitehub-backend:${{ github.sha }} --app sitehub-backend
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

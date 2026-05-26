@@ -49,9 +49,9 @@ If your change affects package structure, dependency rules, error handling patte
 
 ### Tests
 
-- Unit tests live next to the code they test (`#[cfg(test)]` modules).
-- Integration tests (anything that needs SurrealDB) are marked with `#[ignore]` and run separately via `just test-integration`.
-- SurrealDB must be running for integration tests: `just db`.
+- **Unit tests** live next to the code they test (`#[cfg(test)]` modules). Run with `just test`.
+- **API tests** are in separate per-API test projects (`sitehub-public-api-tests`, `sitehub-admin-api-tests`, `sitehub-auth-api-tests`). They send real HTTP requests to a running server. Run with `just test-api` (requires server + SurrealDB running: `just db && just run`).
+- See [ADR-0025](docs/adr/0025-per-api-test-projects.md) for why we use per-API test projects instead of `#[ignore]` tests.
 
 ## PR checklist
 

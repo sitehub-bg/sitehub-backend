@@ -8,6 +8,9 @@ members = [
     "sitehub-admin-api",
     "sitehub-auth-api",
     "sitehub-bin",
+    "sitehub-public-api-tests",
+    "sitehub-admin-api-tests",
+    "sitehub-auth-api-tests",
 ]
 
 [workspace.package]
@@ -40,9 +43,10 @@ async-trait        = "0.1"
 axum               = "0.8"
 tower              = "0.5"
 tower-http         = { version = "0.6", features = ["trace", "cors"] }
-surrealdb          = { version = "3.0", features = ["protocol-ws"] }
-jsonwebtoken       = "9"
+surrealdb          = { version = "3.1", features = ["protocol-ws"] }
+jsonwebtoken       = "10"
 dotenvy            = "0.15"
+reqwest            = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
@@ -54,6 +58,9 @@ must_use_candidate     = "allow"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+[profile.dev]
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 2

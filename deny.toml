@@ -32,56 +32,22 @@ allow = [
     "Zlib",
     "CC0-1.0",
     "CDLA-Permissive-2.0",
+    "BUSL-1.1",
 ]
 confidence-threshold = 0.8
 
-[[licenses.exceptions]]
-allow = ["BUSL-1.1"]
-crate = "surrealdb"
 
 [[licenses.exceptions]]
 allow = ["BUSL-1.1"]
-crate = "surrealdb-core"
+crate = "sitehub-public-api-tests"
 
 [[licenses.exceptions]]
 allow = ["BUSL-1.1"]
-crate = "surrealdb-protocol"
+crate = "sitehub-admin-api-tests"
 
 [[licenses.exceptions]]
 allow = ["BUSL-1.1"]
-crate = "surrealdb-types"
-
-[[licenses.exceptions]]
-allow = ["BUSL-1.1"]
-crate = "surrealdb-types-derive"
-
-[[licenses.exceptions]]
-allow = ["BUSL-1.1"]
-crate = "sitehub-app"
-
-[[licenses.exceptions]]
-allow = ["BUSL-1.1"]
-crate = "sitehub-storage"
-
-[[licenses.exceptions]]
-allow = ["BUSL-1.1"]
-crate = "sitehub-tokens"
-
-[[licenses.exceptions]]
-allow = ["BUSL-1.1"]
-crate = "sitehub-public-api"
-
-[[licenses.exceptions]]
-allow = ["BUSL-1.1"]
-crate = "sitehub-admin-api"
-
-[[licenses.exceptions]]
-allow = ["BUSL-1.1"]
-crate = "sitehub-auth-api"
-
-[[licenses.exceptions]]
-allow = ["BUSL-1.1"]
-crate = "sitehub-bin"
+crate = "sitehub-auth-api-tests"
 
 [[licenses.clarify]]
 crate = "ring"

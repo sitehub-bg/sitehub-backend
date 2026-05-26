@@ -3,7 +3,9 @@
 
 use std::net::SocketAddr;
 
-use axum::{Json, Router, http::StatusCode, routing::get};
+use axum::http::StatusCode;
+use axum::routing::get;
+use axum::{Json, Router};
 use serde_json::{Value, json};
 use tower_http::trace::TraceLayer;
 
@@ -35,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
 
     let addr = SocketAddr::new(host.parse()?, port);
     tracing::info!("sitehub listening on {addr}");
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 
