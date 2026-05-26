@@ -15,6 +15,7 @@ deploy/
 docker-compose.yml
 docker-compose.dev.yml
 justfile
+.cargo/
 scripts/
 LICENSE
 .idea/

@@ -19,64 +19,83 @@ sitehub-bin ──► sitehub-public-api ─┐
 | `sitehub-app` | Domain, ports (traits), use cases, `AppError`. No I/O. |
 | `sitehub-storage` | Driven adapter: SurrealDB repositories. |
 | `sitehub-tokens` | Driven adapter: token issuance and verification (currently JWT). |
-| `sitehub-public-api` | Driving adapter: REST for school sites and mobile app (`/web/v1/...`, `/mobile/v1/...`). |
+| `sitehub-public-api` | Driving adapter: REST for school sites. |
 | `sitehub-admin-api` | Driving adapter: REST for school staff (JWT-authenticated). |
 | `sitehub-auth-api` | Driving adapter: login, refresh, password reset. |
 | `sitehub-bin` | Composition root. Single binary, host-based routing. |
 
 ## Prerequisites
 
-- Rust (stable, edition 2024)
+- Rust (1.95, managed via `rust-toolchain.toml`)
 - Docker & Docker Compose (for SurrealDB)
-- [cargo-watch](https://crates.io/crates/cargo-watch) (optional, for auto-reload)
+- [just](https://github.com/casey/just) (`cargo install just`)
 
 ## Quick start
 
 ```bash
-# 1. Start SurrealDB
-docker compose up -d
+# 1. Bootstrap (installs tools, configures hooks, creates .env)
+./scripts/bootstrap.sh
 
-# 2. Copy environment config
-cp .env.example .env
+# 2. Start SurrealDB
+just db
 
 # 3. Run the server
-cargo run -p sitehub-bin
+just run
 
 # 4. Verify
 curl http://localhost:3000/api/health
 ```
 
-## Development (Zed editor)
+## Development commands
 
-This project includes Zed task definitions in `.zed/tasks.json`. Open the task picker with `ctrl+shift+t` and select a task. Rerun the last task with `ctrl+shift+r`.
-
-### Available tasks
-
-| Task | What it does | When to use |
-|---|---|---|
-| **DB (start)** | `docker compose up -d` | Start SurrealDB before running the app |
-| **DB (stop)** | `docker compose down` | Stop SurrealDB when done |
-| **Run** | `cargo run -p sitehub-bin` | Start the server |
-| **Run (watch)** | `cargo watch -x 'run -p sitehub-bin'` | Start the server with auto-reload on file es |
-| **Build (workspace)** | `cargo build --workspace` | Compile everything |
-| **Build (release)** | `cargo build --release` | Compile optimized binary |
-| **Build (current package)** | `cargo build -p <current>` | Compile only the package of the file you're editing |
-| **Test (workspace)** | `cargo test --workspace` | Run all unit tests |
-| **Test (current package)** | `cargo test -p <current>` | Run tests for the package you're editing |
-| **Test (integration)** | `cargo test --workspace -- --ignored` | Run integration tests (requires SurrealDB running) |
-| **Clippy** | `cargo clippy --workspace --all-targets` | Lint the entire workspace |
-| **Format** | `cargo fmt --all` | Auto-format all code |
-| **Format (check)** | `cargo fmt --all -- --check` | Check formatting without changing files |
-| **Docker (build)** | `docker build -t sitehub .` | Build the production Docker image |
-
-### Typical workflow
-
+```bash
+just check              # fmt + clippy + deny + test (run before pushing)
+just build              # compile workspace
+just run                # start the server
+just watch              # start with auto-reload
+just test               # unit tests
+just test-api           # API tests (requires server + SurrealDB running)
+just db                 # start SurrealDB
+just db-stop            # stop SurrealDB
+just up                 # full stack in Docker (app + SurrealDB)
+just down               # stop full stack
+just db-proxy           # connect to staging DB via Fly proxy
+just                    # list all commands
 ```
-ctrl+shift+t → "DB (start)"        # start SurrealDB
-ctrl+shift+t → "Run (watch)"       # start server with auto-reload
-                                    # edit code, server restarts automatically
-ctrl+shift+t → "Test (workspace)"  # run tests
-ctrl+shift+t → "Clippy"            # lint before committing
+
+### Manual commands
+
+```bash
+# Build
+cargo build --locked --workspace
+cargo build --release --locked
+
+# Lint & format
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo +nightly fmt --all
+cargo +nightly fmt --all -- --check
+
+# Test
+cargo nextest run --locked --workspace
+cargo deny check
+
+# Docker
+docker build -t sitehub .
+```
+
+### Faster linking (optional)
+
+Install `mold` and `clang` for 5-10x faster incremental builds, then create `.cargo/config.toml`:
+
+```bash
+sudo apt install mold clang
+```
+
+```toml
+# .cargo/config.toml (not committed — gitignored)
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 ```
 
 ## Tenancy
@@ -93,11 +112,40 @@ auth.sitehub.bg/...     → auth API (login, tokens)
 Reserved subdomains: admin, auth, api
 ```
 
+## Deployment secrets
+
+Before the first deploy, set these Fly secrets per app:
+
+```bash
+# Database apps
+flyctl secrets set SURREAL_USER=... SURREAL_PASS=... --app sitehub-db-staging
+flyctl secrets set SURREAL_USER=... SURREAL_PASS=... --app sitehub-db-production
+
+# Backend apps
+flyctl secrets set \
+  SURREAL_USER=... \
+  SURREAL_PASS=... \
+  SURREAL_URL=ws://sitehub-db-staging.internal:8000 \
+  SURREAL_NS=sitehub \
+  SURREAL_DB=main \
+  --app sitehub-backend-staging
+
+flyctl secrets set \
+  SURREAL_USER=... \
+  SURREAL_PASS=... \
+  SURREAL_URL=ws://sitehub-db-production.internal:8000 \
+  SURREAL_NS=sitehub \
+  SURREAL_DB=main \
+  --app sitehub-backend-production
+```
+
+JWT secrets will be added when the auth adapter is implemented.
+
 ## Accessing the staging database
 
 The database is not publicly exposed. To connect for debugging, open a temporary tunnel via Fly proxy:
 
 ```bash
-~/.fly/bin/flyctl proxy 8000 --app sitehub-db-staging
+flyctl proxy 8000 --app sitehub-db-staging
 # DB is now available at localhost:8000 — close the terminal to disconnect
 ```

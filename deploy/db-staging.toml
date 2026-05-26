@@ -8,10 +8,10 @@ primary_region = "fra"
   source = "surreal_data"
   destination = "/data"
 
+# Credentials set via Fly secrets: flyctl secrets set SURREAL_USER=... SURREAL_PASS=... --app sitehub-db-staging
 [env]
   SURREAL_BIND = "0.0.0.0:8000"
   SURREAL_PATH = "surrealkv:/data/sitehub.db"
-  SURREAL_CAPS_ALLOW_ALL = "true"
 
 [[services]]
   internal_port = 8000

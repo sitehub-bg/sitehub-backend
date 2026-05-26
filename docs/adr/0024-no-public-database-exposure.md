@@ -11,9 +11,12 @@ We need a way for developers to access the database for debugging without perman
 
 ## Decision
 
-The database apps (`sitehub-db-staging`, `sitehub-db-production`) have no public-facing ports. They are only reachable via Fly.io's internal private network (`sitehub-db-staging.internal:8000`).
+The database apps (`sitehub-db-staging`, `sitehub-db-production`) are not publicly reachable. This is enforced at two levels:
 
-The `deploy/db-staging.toml` and `deploy/db-production.toml` configs do not expose any public HTTP or TCP services.
+1. **Private IPs only** — each DB app has a Flycast private IPv6 address (`fly ips allocate-v6 --private`). No public IPv4 or IPv6 IPs are allocated. Even though `[[services]]` is defined in the deploy config, Fly Proxy only routes traffic from the private network when no public IPs exist.
+2. **Internal DNS** — the backend connects via `sitehub-db-staging.internal:8000` (Fly's 6PN private network). This DNS name is only resolvable from within the same Fly organization.
+
+The `[[services]]` block is retained in the deploy configs because `flyctl proxy` requires it to route traffic. Without it, the proxy command cannot connect.
 
 For developer access, use Fly's proxy command to open a temporary local tunnel:
 
