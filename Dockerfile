@@ -32,7 +32,7 @@ RUN cargo build --release --locked --bin sitehub
 # ---------------------------------------------------------------------------
 # Stage 3: runtime — minimal image, no compiler, no source
 # ---------------------------------------------------------------------------
-FROM debian:bookworm-20250520-slim AS runtime
+FROM debian:bookworm-20260518-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
