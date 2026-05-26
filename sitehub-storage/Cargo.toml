@@ -1,0 +1,19 @@
+[package]
+name = "sitehub-storage"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+sitehub-app = { workspace = true }
+anyhow      = { workspace = true }
+async-trait = { workspace = true }
+tracing     = { workspace = true }
+surrealdb   = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }

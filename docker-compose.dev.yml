@@ -1,0 +1,11 @@
+# Use with the base compose file: just up
+# Or: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+    depends_on:
+      surrealdb:
+        condition: service_healthy

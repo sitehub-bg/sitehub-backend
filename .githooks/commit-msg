@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+#
+# Auto-bump workspace version based on conventional commit prefix.
+#   feat:  → minor bump
+#   fix:   → patch bump
+#   else   → no bump
+#
+# The bumped Cargo.toml + Cargo.lock are amended into the commit.
+
+set -euo pipefail
+
+# Guard against recursive amend
+if [ "${SITEHUB_AMENDING:-}" = "1" ]; then
+    exit 0
+fi
+
+COMMIT_MSG_FILE="$1"
+MSG=$(head -1 "$COMMIT_MSG_FILE")
+
+# Determine bump type from conventional commit prefix
+if [[ "$MSG" =~ ^feat!: ]] || [[ "$MSG" =~ BREAKING[[:space:]]CHANGE ]]; then
+    BUMP="major"
+elif [[ "$MSG" =~ ^feat(\(.+\))?: ]]; then
+    BUMP="minor"
+elif [[ "$MSG" =~ ^fix(\(.+\))?: ]]; then
+    BUMP="patch"
+else
+    exit 0
+fi
+
+CARGO_TOML="$(git rev-parse --show-toplevel)/Cargo.toml"
+
+# Read current version
+CURRENT=$(grep -m1 '^version' "$CARGO_TOML" | sed 's/.*"\(.*\)".*/\1/')
+IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+case "$BUMP" in
+    major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+    minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+    patch) PATCH=$((PATCH + 1)) ;;
+esac
+
+NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+
+# Update workspace version
+sed -i "s/^version = \"$CURRENT\"/version = \"$NEW_VERSION\"/" "$CARGO_TOML"
+
+# Regenerate Cargo.lock to reflect the new version (without upgrading deps)
+if [ -f "$(git rev-parse --show-toplevel)/Cargo.lock" ]; then
+    (cd "$(git rev-parse --show-toplevel)" && cargo generate-lockfile 2>/dev/null || true)
+fi
+
+# Stage the changes and amend
+git add "$CARGO_TOML"
+git add "$(git rev-parse --show-toplevel)/Cargo.lock" 2>/dev/null || true
+
+SITEHUB_AMENDING=1 git commit --amend --no-edit --no-verify

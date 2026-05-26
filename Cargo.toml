@@ -1,0 +1,66 @@
+[workspace]
+resolver = "3"
+members = [
+    "sitehub-app",
+    "sitehub-storage",
+    "sitehub-tokens",
+    "sitehub-public-api",
+    "sitehub-admin-api",
+    "sitehub-auth-api",
+    "sitehub-bin",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Martin Penkov <martin.penkov@eliseustech.com>"]
+license = "BUSL-1.1"
+publish = false
+
+[workspace.dependencies]
+# Internal packages — referenced by path so changes propagate without versioning.
+sitehub-app         = { path = "sitehub-app" }
+sitehub-storage     = { path = "sitehub-storage" }
+sitehub-tokens      = { path = "sitehub-tokens" }
+sitehub-public-api  = { path = "sitehub-public-api" }
+sitehub-admin-api   = { path = "sitehub-admin-api" }
+sitehub-auth-api    = { path = "sitehub-auth-api" }
+
+# Shared external deps — versions pinned here, features chosen per package.
+tokio              = { version = "1", features = ["macros", "rt-multi-thread"] }
+serde              = { version = "1", features = ["derive"] }
+serde_json         = "1"
+anyhow             = "1"
+thiserror          = "2"
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid               = { version = "1", features = ["v4", "serde"] }
+chrono             = { version = "0.4", features = ["serde"] }
+async-trait        = "0.1"
+axum               = "0.8"
+tower              = "0.5"
+tower-http         = { version = "0.6", features = ["trace", "cors"] }
+surrealdb          = { version = "3.0", features = ["protocol-ws"] }
+jsonwebtoken       = "9"
+dotenvy            = "0.15"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Pedantic lints we allow — too noisy or not applicable.
+missing_errors_doc     = "allow"
+missing_panics_doc     = "allow"
+module_name_repetitions = "allow"
+must_use_candidate     = "allow"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+strip = "debuginfo"
+overflow-checks = true

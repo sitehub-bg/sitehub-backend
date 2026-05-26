@@ -1,0 +1,16 @@
+/target
+**/*.rs.bk
+*.pdb
+.env
+.env.local
+.cargo/
+.idea/
+.vscode/
+.zed/
+*.swp
+*.swo
+
+# Ruflo runtime artifacts
+.swarm/
+.claude-flow/
+ruvector.db

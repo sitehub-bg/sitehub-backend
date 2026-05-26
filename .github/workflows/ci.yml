@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+# Cancel superseded runs on the same PR/branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------- Lint & unit tests (every PR + push to main) ----------
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - uses: dtolnay/rust-toolchain@1.95
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format check
+        run: cargo +nightly fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+      - name: Install tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,cargo-nextest
+
+      - name: Dependency audit
+        run: cargo deny check
+
+      - name: Unit tests
+        run: cargo nextest run --locked --workspace
+
+  # ---------- Integration tests with SurrealDB (every PR + push to main) ----------
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SURREAL_URL: ws://localhost:8000
+      SURREAL_NS: sitehub_test
+      SURREAL_DB: test
+      SURREAL_USER: root
+      SURREAL_PASS: root
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+
+      - name: Start SurrealDB
+        run: |
+          docker run -d --name surrealdb -p 8000:8000 \
+            surrealdb/surrealdb:v3 start \
+            --user root --pass root --bind 0.0.0.0:8000 memory
+          until docker exec surrealdb surreal is-ready --endpoint http://localhost:8000 2>/dev/null; do
+            sleep 1
+          done
+
+      - name: Integration tests
+        run: cargo nextest run --locked --workspace --run-ignored ignored-only
+        # Convention: mark integration tests with #[ignore] so they only
+        # run in this job where SurrealDB is available.
+
+  # ---------- Build & push Docker image (main + tags only) ----------
+  docker:
+    needs: [check, integration]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: registry.fly.io
+          username: x
+          password: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: registry.fly.io/sitehub-backend
+          tags: |
+            type=raw,value=${{ github.sha }}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------- Deploy to staging (push to main) ----------
+  deploy-staging:
+    needs: [docker]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: superfly/flyctl-action/setup-flyctl@v2
+
+      - name: Deploy to staging
+        run: flyctl deploy --image registry.fly.io/sitehub-backend:${{ github.sha }} --app sitehub-backend-staging
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  # ---------- Deploy to production (tagged release v*) ----------
+  deploy-production:
+    needs: [docker]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: superfly/flyctl-action/setup-flyctl@v2
+
+      - name: Deploy to production
+        run: flyctl deploy --image registry.fly.io/sitehub-backend:${{ github.sha }} --app sitehub-backend
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

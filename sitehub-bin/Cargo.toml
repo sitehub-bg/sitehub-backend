@@ -1,0 +1,32 @@
+[package]
+name = "sitehub-bin"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "sitehub"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+sitehub-app         = { workspace = true }
+sitehub-storage     = { workspace = true }
+sitehub-tokens      = { workspace = true }
+sitehub-public-api  = { workspace = true }
+sitehub-admin-api   = { workspace = true }
+sitehub-auth-api    = { workspace = true }
+
+tokio              = { workspace = true }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow             = { workspace = true }
+axum               = { workspace = true }
+serde_json         = { workspace = true }
+tower              = { workspace = true }
+tower-http         = { workspace = true }
+dotenvy            = { workspace = true }
