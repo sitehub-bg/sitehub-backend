@@ -41,7 +41,7 @@ axum               = "0.8"
 tower              = "0.5"
 tower-http         = { version = "0.6", features = ["trace", "cors"] }
 surrealdb          = { version = "3.0", features = ["protocol-ws"] }
-jsonwebtoken       = "9"
+jsonwebtoken       = "10"
 dotenvy            = "0.15"
 
 [workspace.lints.clippy]
