@@ -83,6 +83,18 @@ crate = "sitehub-auth-api"
 allow = ["BUSL-1.1"]
 crate = "sitehub-bin"
 
+[[licenses.exceptions]]
+allow = ["BUSL-1.1"]
+crate = "sitehub-public-api-tests"
+
+[[licenses.exceptions]]
+allow = ["BUSL-1.1"]
+crate = "sitehub-admin-api-tests"
+
+[[licenses.exceptions]]
+allow = ["BUSL-1.1"]
+crate = "sitehub-auth-api-tests"
+
 [[licenses.clarify]]
 crate = "ring"
 expression = "MIT AND ISC AND OpenSSL"
