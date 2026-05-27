@@ -17,7 +17,7 @@ jobs:
     environment: staging
     steps:
       - uses: actions/checkout@v6
-      - uses: superfly/flyctl-action/setup-flyctl@v2
+      - uses: superfly/flyctl-actions/setup-flyctl@v1.4
 
       - name: Deploy SurrealDB to staging
         run: flyctl deploy --config deploy/db-staging.toml --app sitehub-db-staging

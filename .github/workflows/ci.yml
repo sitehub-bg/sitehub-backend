@@ -197,7 +197,7 @@ jobs:
     environment: staging
     steps:
       - uses: actions/checkout@v6
-      - uses: superfly/flyctl-action/setup-flyctl@v2
+      - uses: superfly/flyctl-actions/setup-flyctl@v1.4
 
       - name: Deploy to staging
         run: flyctl deploy --image registry.fly.io/sitehub-backend-staging:${{ github.sha }} --config deploy/backend-staging.toml --app sitehub-backend-staging

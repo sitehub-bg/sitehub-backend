@@ -17,7 +17,7 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v6
-      - uses: superfly/flyctl-action/setup-flyctl@v2
+      - uses: superfly/flyctl-actions/setup-flyctl@v1.4
 
       - name: Deploy SurrealDB to production
         run: flyctl deploy --config deploy/db-production.toml --app sitehub-db-production
