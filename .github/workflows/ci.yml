@@ -53,8 +53,23 @@ jobs:
         with:
           shared-key: rust-build
           save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@nextest
       - name: Build workspace
         run: cargo build --locked --workspace --all-targets
+      - name: Archive test binaries
+        run: cargo nextest archive --locked --workspace --archive-file nextest-archive.tar.zst
+      - name: Upload nextest archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextest-archive
+          path: nextest-archive.tar.zst
+          retention-days: 1
+      - name: Upload server binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-binary
+          path: target/debug/sitehub
+          retention-days: 1
 
   # ---------- Clippy (warm cache from build) ----------
   clippy:
@@ -73,27 +88,25 @@ jobs:
       - name: Clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
-  # ---------- Unit tests (warm cache from build) ----------
+  # ---------- Unit tests (pre-built from build job) ----------
   test-unit:
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.95
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-build
-          save-if: false
       - uses: taiki-e/install-action@nextest
+      - name: Download nextest archive
+        uses: actions/download-artifact@v4
+        with:
+          name: nextest-archive
       - name: Unit tests
-        run: cargo nextest run --locked --workspace --exclude sitehub-public-api-tests --exclude sitehub-admin-api-tests --exclude sitehub-auth-api-tests
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --exclude sitehub-public-api-tests --exclude sitehub-admin-api-tests --exclude sitehub-auth-api-tests
 
-  # ---------- API tests (warm cache from build, live server + SurrealDB) ----------
+  # ---------- API tests (pre-built from build job, live server + SurrealDB) ----------
   test-api:
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     strategy:
       matrix:
         package:
@@ -110,13 +123,17 @@ jobs:
       SITEHUB_PORT: 3000
       SITEHUB_TEST_URL: http://localhost:3000
     steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.95
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust-build
-          save-if: false
       - uses: taiki-e/install-action@nextest
+      - name: Download nextest archive
+        uses: actions/download-artifact@v4
+        with:
+          name: nextest-archive
+      - name: Download server binary
+        uses: actions/download-artifact@v4
+        with:
+          name: server-binary
+      - name: Make server executable
+        run: chmod +x sitehub
 
       - name: Start SurrealDB
         run: |
@@ -128,12 +145,9 @@ jobs:
             sleep 1
           done
 
-      - name: Build server
-        run: cargo build --locked -p sitehub-bin
-
       - name: Start server
         run: |
-          ./target/debug/sitehub > /tmp/server.log 2>&1 &
+          ./sitehub > /tmp/server.log 2>&1 &
           echo $! > /tmp/server.pid
 
       - name: Wait for server
@@ -152,7 +166,7 @@ jobs:
           exit 1
 
       - name: API tests (${{ matrix.package }})
-        run: cargo nextest run --locked -p ${{ matrix.package }}
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . -p ${{ matrix.package }}
 
   # ---------- Build & deploy staging (push to main) ----------
   docker-staging:
