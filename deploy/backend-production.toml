@@ -1,5 +1,5 @@
 app = "sitehub-backend-production"
-primary_region = "fra"
+primary_region = "ams"
 
 [http_service]
   internal_port = 3000

@@ -1,5 +1,5 @@
 app = "sitehub-db-staging"
-primary_region = "fra"
+primary_region = "ams"
 
 [build]
   image = "surrealdb/surrealdb:v3.1.0"
