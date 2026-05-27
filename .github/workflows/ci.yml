@@ -59,13 +59,13 @@ jobs:
       - name: Archive test binaries
         run: cargo nextest archive --locked --workspace --archive-file nextest-archive.tar.zst
       - name: Upload nextest archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nextest-archive
           path: nextest-archive.tar.zst
           retention-days: 1
       - name: Upload server binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: server-binary
           path: target/debug/sitehub
@@ -96,11 +96,11 @@ jobs:
     steps:
       - uses: taiki-e/install-action@nextest
       - name: Download nextest archive
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: nextest-archive
       - name: Unit tests
-        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --exclude sitehub-public-api-tests --exclude sitehub-admin-api-tests --exclude sitehub-auth-api-tests
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . -E 'not (package(sitehub-public-api-tests) | package(sitehub-admin-api-tests) | package(sitehub-auth-api-tests))'
 
   # ---------- API tests (pre-built from build job, live server + SurrealDB) ----------
   test-api:
@@ -125,11 +125,11 @@ jobs:
     steps:
       - uses: taiki-e/install-action@nextest
       - name: Download nextest archive
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: nextest-archive
       - name: Download server binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: server-binary
       - name: Make server executable
@@ -166,7 +166,7 @@ jobs:
           exit 1
 
       - name: API tests (${{ matrix.package }})
-        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . -p ${{ matrix.package }}
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . -E 'package(${{ matrix.package }})'
 
   # ---------- Build & deploy staging (push to main) ----------
   docker-staging:
