@@ -43,7 +43,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - uses: superfly/flyctl-action/setup-flyctl@v2
+      - uses: superfly/flyctl-actions/setup-flyctl@v1.4
 
       - name: Deploy to production
         run: flyctl deploy --image registry.fly.io/sitehub-backend-production:${{ github.sha }} --config deploy/backend-production.toml --app sitehub-backend-production
