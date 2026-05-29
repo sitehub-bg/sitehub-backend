@@ -189,27 +189,16 @@ mod tests {
         assert!(c.validate().is_err());
     }
 
-    // ---- Config::load() integration tests ------------------------------------
-    //
-    // These tests manipulate process-wide environment variables, so they must
-    // run serialized. The mutex guard is acquired at the start of each test.
-
     use std::io::Write;
-    use std::sync::Mutex;
-
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
-
-    fn clear_sitehub_env() {
-        for var in ALLOWED_ENV_VARS {
-            // SAFETY: tests are serialized by ENV_LOCK above.
-            unsafe { std::env::remove_var(var) };
-        }
-    }
 
     fn write_toml(contents: &str) -> tempfile::NamedTempFile {
         let mut f = tempfile::NamedTempFile::new().unwrap();
         f.write_all(contents.as_bytes()).unwrap();
         f
+    }
+
+    fn isolated_env() -> Vec<(&'static str, Option<&'static str>)> {
+        ALLOWED_ENV_VARS.iter().map(|v| (*v, None)).collect()
     }
 
     const VALID_TOML: &str = r#"
@@ -221,57 +210,51 @@ mod tests {
 
     #[test]
     fn load_fails_when_config_env_var_not_set() {
-        let _g = ENV_LOCK.lock().unwrap();
-        clear_sitehub_env();
-
-        let err = Config::load().unwrap_err();
-        assert!(err.to_string().contains("SITEHUB_CONFIG"), "got: {err}");
+        temp_env::with_vars(isolated_env(), || {
+            let err = Config::load().unwrap_err();
+            assert!(err.to_string().contains("SITEHUB_CONFIG"), "got: {err}");
+        });
     }
 
     #[test]
     fn load_fails_when_config_file_missing() {
-        let _g = ENV_LOCK.lock().unwrap();
-        clear_sitehub_env();
-        // SAFETY: tests are serialized.
-        unsafe { std::env::set_var("SITEHUB_CONFIG", "/nonexistent/path.toml") };
-
-        assert!(Config::load().is_err());
+        let mut env = isolated_env();
+        env.push(("SITEHUB_CONFIG", Some("/nonexistent/path.toml")));
+        temp_env::with_vars(env, || {
+            assert!(Config::load().is_err());
+        });
     }
 
     #[test]
     fn load_reads_values_from_toml_file() {
-        let _g = ENV_LOCK.lock().unwrap();
-        clear_sitehub_env();
         let f = write_toml(VALID_TOML);
-        // SAFETY: tests are serialized.
-        unsafe { std::env::set_var("SITEHUB_CONFIG", f.path()) };
-
-        let cfg = Config::load().unwrap();
-        assert_eq!(cfg.host, "127.0.0.1");
-        assert_eq!(cfg.port, 4000);
-        assert_eq!(cfg.request_timeout_secs, 7);
-        assert_eq!(cfg.shutdown_grace_secs, 3);
+        let path = f.path().to_str().unwrap().to_string();
+        let mut env = isolated_env();
+        env.push(("SITEHUB_CONFIG", Some(path.as_str())));
+        temp_env::with_vars(env, || {
+            let cfg = Config::load().unwrap();
+            assert_eq!(cfg.host, "127.0.0.1");
+            assert_eq!(cfg.port, 4000);
+            assert_eq!(cfg.request_timeout_secs, 7);
+            assert_eq!(cfg.shutdown_grace_secs, 3);
+        });
     }
 
     #[test]
     fn load_env_var_overrides_toml_value() {
-        let _g = ENV_LOCK.lock().unwrap();
-        clear_sitehub_env();
         let f = write_toml(VALID_TOML);
-        // SAFETY: tests are serialized.
-        unsafe {
-            std::env::set_var("SITEHUB_CONFIG", f.path());
-            std::env::set_var("SITEHUB_PORT", "9999");
-        }
-
-        let cfg = Config::load().unwrap();
-        assert_eq!(cfg.port, 9999, "env var should override TOML");
+        let path = f.path().to_str().unwrap().to_string();
+        let mut env = isolated_env();
+        env.push(("SITEHUB_CONFIG", Some(path.as_str())));
+        env.push(("SITEHUB_PORT", Some("9999")));
+        temp_env::with_vars(env, || {
+            let cfg = Config::load().unwrap();
+            assert_eq!(cfg.port, 9999, "env var should override TOML");
+        });
     }
 
     #[test]
     fn load_fails_on_unknown_toml_key() {
-        let _g = ENV_LOCK.lock().unwrap();
-        clear_sitehub_env();
         let f = write_toml(
             r#"
             host = "127.0.0.1"
@@ -281,27 +264,26 @@ mod tests {
             mystery_field = "oops"
         "#,
         );
-        // SAFETY: tests are serialized.
-        unsafe { std::env::set_var("SITEHUB_CONFIG", f.path()) };
-
-        assert!(Config::load().is_err(), "deny_unknown_fields should reject");
+        let path = f.path().to_str().unwrap().to_string();
+        let mut env = isolated_env();
+        env.push(("SITEHUB_CONFIG", Some(path.as_str())));
+        temp_env::with_vars(env, || {
+            assert!(Config::load().is_err(), "deny_unknown_fields should reject");
+        });
     }
 
     #[test]
     fn load_fails_on_unknown_sitehub_env_var() {
-        let _g = ENV_LOCK.lock().unwrap();
-        clear_sitehub_env();
+        // Simulates a realistic typo: SITEHUB_PROT (transposed) instead of SITEHUB_PORT.
+        // The allowlist should reject it at startup rather than silently ignore.
         let f = write_toml(VALID_TOML);
-        // SAFETY: tests are serialized.
-        unsafe {
-            std::env::set_var("SITEHUB_CONFIG", f.path());
-            std::env::set_var("SITEHUB_PROT", "3000"); // typo: PROT vs PORT
-        }
-
-        let err = Config::load().unwrap_err();
-        // Cleanup after the assertion so a failed test doesn't pollute later runs.
-        // SAFETY: tests are serialized.
-        unsafe { std::env::remove_var("SITEHUB_PROT") };
-        assert!(err.to_string().contains("SITEHUB_PROT"), "got: {err}");
+        let path = f.path().to_str().unwrap().to_string();
+        let mut env = isolated_env();
+        env.push(("SITEHUB_CONFIG", Some(path.as_str())));
+        env.push(("SITEHUB_PROT", Some("3000")));
+        temp_env::with_vars(env, || {
+            let err = Config::load().unwrap_err();
+            assert!(err.to_string().contains("SITEHUB_PROT"), "got: {err}");
+        });
     }
 }
