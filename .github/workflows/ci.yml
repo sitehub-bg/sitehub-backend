@@ -121,7 +121,6 @@ jobs:
       SURREAL_USER: root
       SURREAL_PASS: root
       SITEHUB_CONFIG: config/test.toml
-      SITEHUB_TEST_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v6
       - uses: taiki-e/install-action@nextest
@@ -218,4 +217,35 @@ jobs:
         run: flyctl deploy --image registry.fly.io/sitehub-backend-staging:${{ github.sha }} --config deploy/backend-staging.toml --app sitehub-backend-staging
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  # ---------- Promote staging image to production (gated by environment approval) ----------
+  deploy-production:
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production # Configure required reviewer in repo settings.
+    permissions:
+      contents: write # for creating release tag
+    steps:
+      - uses: actions/checkout@v6
+      - uses: superfly/flyctl-actions/setup-flyctl@v1.4
+
+      - name: Deploy staging image to production
+        run: flyctl deploy --image registry.fly.io/sitehub-backend-staging:${{ github.sha }} --config deploy/backend-production.toml --app sitehub-backend-production
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Tag release (only if Cargo.toml version is not already tagged)
+        run: |
+          VERSION=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+          TAG="v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists, skipping"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "Tagged $TAG"
+          fi
 

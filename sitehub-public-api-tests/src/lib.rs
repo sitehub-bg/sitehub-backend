@@ -5,10 +5,7 @@
 mod tests {
     #[tokio::test]
     async fn health_check_returns_ok() {
-        let base_url =
-            std::env::var("SITEHUB_TEST_URL").unwrap_or_else(|_| "http://localhost:3000".into());
-
-        let resp = reqwest::get(format!("{base_url}/api/health"))
+        let resp = reqwest::get("http://localhost:3000/api/health")
             .await
             .expect("failed to reach server");
 

@@ -1,0 +1,41 @@
+name: Rollback Production
+
+# Default: revert to the previous Fly release (no input needed).
+# Optional: supply a SHA to pin production to a specific previously-built
+# staging image (the image must still exist in the registry).
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Optional: Git SHA of a staging image to deploy. Leave empty to revert to previous release."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+      - uses: superfly/flyctl-actions/setup-flyctl@v1.4
+
+      - name: Revert to previous release (no SHA provided)
+        if: inputs.sha == ''
+        run: flyctl releases revert --app sitehub-backend-production
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Deploy specified staging image to production
+        if: inputs.sha != ''
+        run: flyctl deploy --image registry.fly.io/sitehub-backend-staging:${{ inputs.sha }} --config deploy/backend-production.toml --app sitehub-backend-production
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

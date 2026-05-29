@@ -1,7 +1,9 @@
 app = "sitehub-backend-production"
 primary_region = "ams"
 kill_signal = "SIGTERM"
-kill_timeout = "25s"
+# Must be >= app shutdown_timeout (request_timeout_secs + shutdown_grace_secs
+# in config/production.toml) + 10s margin. Keep in sync manually.
+kill_timeout = "35s"
 
 [env]
   SITEHUB_CONFIG = "config/production.toml"
@@ -11,8 +13,8 @@ kill_timeout = "25s"
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 1
-  max_machines_running = 2
+  min_machines_running = 0
+  max_machines_running = 1
 
 [vm]
   memory = "256mb"

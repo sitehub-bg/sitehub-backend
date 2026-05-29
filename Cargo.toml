@@ -47,6 +47,7 @@ surrealdb          = { version = "3.1", features = ["protocol-ws"] }
 jsonwebtoken       = "10"
 dotenvy            = "0.15"
 figment            = { version = "0.10", features = ["toml", "env"] }
+tempfile           = "3"
 reqwest            = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [workspace.lints.clippy]
