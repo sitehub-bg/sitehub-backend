@@ -4,6 +4,9 @@ primary_region = "ams"
 [build]
   image = "surrealdb/surrealdb:v3.1.0"
 
+[processes]
+  app = "start"
+
 [mounts]
   source = "surreal_data"
   destination = "/data"
