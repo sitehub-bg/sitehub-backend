@@ -120,8 +120,7 @@ jobs:
       SURREAL_DB: test
       SURREAL_USER: root
       SURREAL_PASS: root
-      SITEHUB_HOST: 127.0.0.1
-      SITEHUB_PORT: 3000
+      SITEHUB_CONFIG: config/test.toml
       SITEHUB_TEST_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v6
