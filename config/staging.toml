@@ -1,0 +1,7 @@
+# No secrets in this file. Secrets come from SITEHUB_* env vars (Fly.io
+# secrets in deployed envs). See ADR-0034.
+
+host = "0.0.0.0"
+port = 3000
+request_timeout_secs = 5
+shutdown_grace_secs = 10

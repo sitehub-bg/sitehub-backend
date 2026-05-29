@@ -43,6 +43,9 @@ RUN groupadd --gid 1001 sitehub && \
     useradd --uid 1001 --gid sitehub --shell /bin/false sitehub
 
 COPY --from=builder /app/target/release/sitehub /usr/local/bin/sitehub
+COPY --from=builder /app/config /config
+
+WORKDIR /
 
 USER sitehub
 

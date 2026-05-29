@@ -1,5 +1,12 @@
 app = "sitehub-backend-staging"
 primary_region = "ams"
+kill_signal = "SIGTERM"
+# Must be >= app shutdown_timeout (request_timeout_secs + shutdown_grace_secs
+# in config/staging.toml) + 10s margin. Keep in sync manually.
+kill_timeout = "25s"
+
+[env]
+  SITEHUB_CONFIG = "config/staging.toml"
 
 [http_service]
   internal_port = 3000
