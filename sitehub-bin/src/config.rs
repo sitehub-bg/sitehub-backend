@@ -105,8 +105,7 @@ impl Config {
         // When request_timeout is disabled (dev), the shutdown deadline is just
         // the grace window — we don't wait for an unlimited request.
         if self.request_timeout_enabled() {
-            self.request_timeout()
-                .saturating_add(self.shutdown_grace())
+            self.request_timeout().saturating_add(self.shutdown_grace())
         } else {
             self.shutdown_grace()
         }
@@ -226,10 +225,7 @@ mod tests {
         clear_sitehub_env();
 
         let err = Config::load().unwrap_err();
-        assert!(
-            err.to_string().contains("SITEHUB_CONFIG"),
-            "got: {err}"
-        );
+        assert!(err.to_string().contains("SITEHUB_CONFIG"), "got: {err}");
     }
 
     #[test]
@@ -306,9 +302,6 @@ mod tests {
         // Cleanup after the assertion so a failed test doesn't pollute later runs.
         // SAFETY: tests are serialized.
         unsafe { std::env::remove_var("SITEHUB_PROT") };
-        assert!(
-            err.to_string().contains("SITEHUB_PROT"),
-            "got: {err}"
-        );
+        assert!(err.to_string().contains("SITEHUB_PROT"), "got: {err}");
     }
 }
