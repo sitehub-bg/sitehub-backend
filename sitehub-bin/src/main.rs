@@ -1,6 +1,3 @@
-//! Composition root for sitehub. Wires concrete adapters into ports and
-//! dispatches requests to driving adapters based on the Host header.
-
 mod config;
 
 use std::net::SocketAddr;
@@ -18,9 +15,7 @@ use crate::config::Config;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Per ADR-0034: only load .env in debug builds. Release builds (Fly.io)
-    // must get config from the environment directly, never from a file that
-    // could shadow Fly secrets.
+    // ADR-0034: .env in debug builds only; release must not be able to shadow Fly secrets.
     #[cfg(debug_assertions)]
     match dotenvy::dotenv() {
         Ok(_) | Err(dotenvy::Error::Io(_)) => {}
@@ -61,8 +56,7 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    // Install signal handlers before serving so install errors propagate
-    // cleanly via `?` instead of panicking from inside the async block.
+    // Install before the serve future so handler errors propagate via `?`, not panic.
     let sigterm = signal(SignalKind::terminate()).context("install SIGTERM handler")?;
     let sigint = signal(SignalKind::interrupt()).context("install SIGINT handler")?;
 

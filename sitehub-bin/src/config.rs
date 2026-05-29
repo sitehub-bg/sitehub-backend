@@ -17,9 +17,6 @@ pub struct Config {
     pub shutdown_grace_secs: u64,
 }
 
-// Env vars allowed at runtime. SITEHUB_CONFIG points at the config file and is
-// not a Config field; the rest map to fields. Any SITEHUB_* var not in this list
-// is treated as a typo and fails startup.
 const ALLOWED_ENV_VARS: &[&str] = &[
     "SITEHUB_CONFIG",
     "SITEHUB_HOST",
@@ -28,9 +25,12 @@ const ALLOWED_ENV_VARS: &[&str] = &[
     "SITEHUB_SHUTDOWN_GRACE_SECS",
 ];
 
-// Hand-written Debug per ADR-0034: any new field must be added here explicitly,
-// forcing the author to decide whether it's safe to log. Secret-bearing fields
-// should be wrapped in a redacting type and not exposed via Debug.
+fn sitehub_env_provider() -> Env {
+    Env::prefixed("SITEHUB_").ignore(&["CONFIG"])
+}
+
+// Hand-written per ADR-0034: every new field must be added here explicitly so
+// secret-bearing fields cannot silently leak through Debug.
 impl std::fmt::Debug for Config {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Config")
@@ -50,7 +50,7 @@ impl Config {
             .context("SITEHUB_CONFIG must be set to the path of a config TOML file")?;
 
         let cfg: Self = Figment::from(Toml::file(&path))
-            .merge(Env::prefixed("SITEHUB_"))
+            .merge(sitehub_env_provider())
             .extract()
             .with_context(|| format!("failed to load config from {path}"))?;
 
@@ -67,8 +67,6 @@ impl Config {
             bail!("port must be > 0");
         }
 
-        // request_timeout_secs == 0 means disabled (no per-request timeout).
-        // Allowed in dev for debugging; production should always set a real bound.
         if self.request_timeout_secs > MAX_TIMEOUT_SECS {
             bail!(
                 "request_timeout_secs must be <= {MAX_TIMEOUT_SECS} (got {}); use 0 to disable",
@@ -102,8 +100,6 @@ impl Config {
     }
 
     pub fn shutdown_timeout(&self) -> Duration {
-        // When request_timeout is disabled (dev), the shutdown deadline is just
-        // the grace window — we don't wait for an unlimited request.
         if self.request_timeout_enabled() {
             self.request_timeout().saturating_add(self.shutdown_grace())
         } else {
@@ -274,8 +270,6 @@ mod tests {
 
     #[test]
     fn load_fails_on_unknown_sitehub_env_var() {
-        // Simulates a realistic typo: SITEHUB_PROT (transposed) instead of SITEHUB_PORT.
-        // The allowlist should reject it at startup rather than silently ignore.
         let f = write_toml(VALID_TOML);
         let path = f.path().to_str().unwrap().to_string();
         let mut env = isolated_env();
