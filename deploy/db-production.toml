@@ -5,7 +5,7 @@ primary_region = "ams"
   image = "surrealdb/surrealdb:v3.1.0"
 
 [processes]
-  app = "start"
+  surreal = "start"
 
 [mounts]
   source = "surreal_data"
@@ -19,6 +19,7 @@ primary_region = "ams"
 [[services]]
   internal_port = 8000
   protocol = "tcp"
+  processes = ["surreal"]
 
   [[services.ports]]
     port = 443
