@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 #
 # Auto-bump workspace version based on conventional commit prefix.
-#   feat:  → minor bump
-#   fix:   → patch bump
-#   else   → no bump
+#   feat!: or BREAKING CHANGE → major bump
+#   feat:                     → minor bump
+#   fix:                      → patch bump
+#   chore:                    → patch bump
+#   else                      → no bump
 #
 # The bumped Cargo.toml + Cargo.lock are amended into the commit.
 
@@ -17,12 +19,34 @@ fi
 COMMIT_MSG_FILE="$1"
 MSG=$(head -1 "$COMMIT_MSG_FILE")
 
+# Allow merge / revert commits to bypass validation
+if [[ "$MSG" =~ ^(Merge|Revert) ]]; then
+    exit 0
+fi
+
+# Recognized conventional commit types — only those that bump the version
+VALID_TYPES="feat|fix|chore"
+
+# Validate format: type[(scope)][!]: subject
+PREFIX_RE="^(${VALID_TYPES})(\([^)]+\))?!?: "
+if ! [[ "$MSG" =~ $PREFIX_RE ]]; then
+    cat >&2 <<EOF
+ERROR: commit message does not match conventional commit format.
+  Got:      $MSG
+  Expected: <type>[(scope)][!]: <subject>
+  Types:    ${VALID_TYPES//|/, }
+
+Common typos: 'hore:' → 'chore:', 'fxi:' → 'fix:', 'cohre:' → 'chore:'.
+EOF
+    exit 1
+fi
+
 # Determine bump type from conventional commit prefix
 if [[ "$MSG" =~ ^feat!(\(.+\))?: ]] || [[ "$MSG" =~ BREAKING[[:space:]]CHANGE ]]; then
     BUMP="major"
 elif [[ "$MSG" =~ ^feat(\(.+\))?: ]]; then
     BUMP="minor"
-elif [[ "$MSG" =~ ^fix(\(.+\))?: ]]; then
+elif [[ "$MSG" =~ ^(fix|chore)(\(.+\))?: ]]; then
     BUMP="patch"
 else
     exit 0

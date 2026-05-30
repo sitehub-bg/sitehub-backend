@@ -16,7 +16,12 @@ A `commit-msg` git hook (`.githooks/commit-msg`) parses the conventional commit 
 - `feat!:` or `BREAKING CHANGE` → major bump
 - `feat:` → minor bump
 - `fix:` → patch bump
-- Anything else → no bump
+- `chore:` → patch bump
+- Anything else (e.g. `docs:`, `ci:`, `style:`, typos like `hore:`) → **rejected**
+
+Only the four bumping prefixes are accepted. Other conventional types (`docs:`, `ci:`, etc.) are deliberately disallowed so the developer reaches for `chore:` and the version moves forward. This catches both typos (`hore:`, `fxi:`) and "harmless" prefixes that would otherwise leave the version permanently stuck. `Merge` and `Revert` commits bypass the check.
+
+`chore:` bumps because most non-feature commits on this project still change runtime behavior (config, infrastructure, dependencies). Treating them as no-op left the version permanently stuck at 0.1.0.
 
 Production deploys are triggered by manually pushing a `v*` tag pointing at the desired commit.
 
